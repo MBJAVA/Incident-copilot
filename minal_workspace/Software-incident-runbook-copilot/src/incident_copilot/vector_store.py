@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Optional, Protocol
 
+from langchain_core.documents import Document
+from langchain_core.retrievers import BaseRetriever
 from pinecone import Pinecone
 from pinecone.exceptions import NotFoundException
 from pinecone_text.sparse import BM25Encoder
@@ -81,9 +83,23 @@ class PineconeHybridStore:
 
     def search(self, query: str, top_k: int = 20, service: str | None = None,
                environment: str | None = None, include_superseded: bool = False) -> list[RetrievedEvidence]:
+        documents = self.as_retriever(
+            top_k=top_k, service=service, environment=environment,
+            include_superseded=include_superseded,
+        ).invoke(query)
+        return [
+            RetrievedEvidence(
+                chunk=_chunk_from_document(document),
+                score=float(document.metadata.get("score", 0.0)),
+            )
+            for document in documents
+        ]
+
+    def as_retriever(self, top_k: int = 20, service: str | None = None,
+                     environment: str | None = None,
+                     include_superseded: bool = False) -> LangChainHybridRetriever:
         if top_k < 1:
             raise ValueError("top_k must be positive")
-        sparse_query = self.sparse_encoder.encode_queries(query)
         filters: list[dict[str, Any]] = []
         if service:
             filters.append({"service": {"$in": [service, "platform"]}})
@@ -96,36 +112,56 @@ class PineconeHybridStore:
             metadata_filter = filters[0]
         elif filters:
             metadata_filter = {"$and": filters}
+        return LangChainHybridRetriever(
+            index=self.index, embedder=self.embedder, sparse_encoder=self.sparse_encoder,
+            namespace=self.namespace, alpha=self.alpha, top_k=top_k,
+            metadata_filter=metadata_filter,
+        )
 
+
+class LangChainHybridRetriever(BaseRetriever):
+    """LangChain retriever over the project's existing hybrid Pinecone records."""
+
+    index: Any
+    embedder: Any
+    sparse_encoder: Any
+    namespace: str
+    alpha: float
+    top_k: int
+    metadata_filter: Optional[dict[str, Any]] = None
+
+    def _get_relevant_documents(self, query: str, *, run_manager: Any) -> list[Document]:
+        sparse_query = self.sparse_encoder.encode_queries(query)
         response = self.index.query(
             vector=[self.alpha * value for value in self.embedder.embed_query(query)],
             sparse_vector={
                 "indices": sparse_query["indices"],
                 "values": [(1.0 - self.alpha) * value for value in sparse_query["values"]],
             },
-            top_k=top_k,
+            top_k=self.top_k,
             include_metadata=True,
             namespace=self.namespace,
-            filter=metadata_filter,
+            filter=self.metadata_filter,
         )
-        return [
-            RetrievedEvidence(
-                chunk=_chunk_from_match(match),
-                score=float(match.score or 0.0),
-            )
-            for match in response.matches
-            if match.metadata
-        ]
+        documents = []
+        for match in response.matches:
+            if not match.metadata:
+                continue
+            metadata = dict(match.metadata)
+            content = str(metadata.pop("content"))
+            metadata["score"] = float(match.score or 0.0)
+            documents.append(Document(id=str(match.id), page_content=content, metadata=metadata))
+        return documents
 
 
 def make_embedder(api_key: str, model: str = "text-embedding-3-small") -> OpenAIEmbedder:
     return OpenAIEmbedder(api_key=api_key, model=model)
 
 
-def _chunk_from_match(match: Any) -> EvidenceChunk:
-    metadata = dict(match.metadata or {})
+def _chunk_from_document(document: Document) -> EvidenceChunk:
+    metadata = document.metadata
     return EvidenceChunk(
-        chunk_id=str(match.id),
+        chunk_id=str(document.id),
         doc_id=str(metadata["doc_id"]),
         source_path=str(metadata["source_path"]),
         section_path=str(metadata["section_path"]),
@@ -138,5 +174,5 @@ def _chunk_from_match(match: Any) -> EvidenceChunk:
         source_type=str(metadata["source_type"]),
         content_hash=str(metadata["content_hash"]),
         chunk_index=int(metadata["chunk_index"]),
-        content=str(metadata["content"]),
+        content=document.page_content,
     )

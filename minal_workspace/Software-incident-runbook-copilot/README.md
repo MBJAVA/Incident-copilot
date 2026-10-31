@@ -1,6 +1,6 @@
 # Software Incident and Runbook Copilot
 
-An internal, read-only incident triage prototype. This project lives separately from the Job Search Assistant. The current implementation can parse and chunk the synthetic corpus, fit a local BM25 encoder, index dense+sparse vectors in Pinecone, retrieve evidence, and generate citation-constrained triage responses with OpenAI.
+An internal, read-only incident triage prototype. This project lives separately from the Job Search Assistant. The current implementation can parse and chunk the synthetic corpus, fit a local BM25 encoder, index dense+sparse vectors in Pinecone, retrieve evidence through a LangChain retriever, and generate citation-constrained triage responses through LangChain's OpenAI integration.
 
 ## Use case
 
@@ -16,7 +16,7 @@ All content in this prototype is synthetic and fictional. It is written as Engli
 - 5 architecture documents: service map, checkout/event flow, alert semantics, change/rollback policy, and ownership/escalation.
 - 6 postmortems: five resolved incidents and one deliberately inconclusive incident to test abstention.
 - 6 synthetic incident snapshots: alert and telemetry evidence, kept separate from the searchable prose corpus. Three include representative Splunk-style search results.
-- 27 labeled evaluation questions: direct lookup, diagnosis, prevention, similar-incident discrimination, conflicting/stale evidence, safety boundaries, and insufficient-evidence cases.
+- 28 labeled evaluation questions: direct lookup, diagnosis, prevention, similar-incident discrimination, conflicting/stale evidence, safety boundaries, and insufficient-evidence cases.
 
 For a real deployment, service owners remain authoritative for runbooks and architecture docs; the incident-management system owns postmortems; observability systems own alerts and telemetry. This sample corpus is a learning fixture, not a production source of truth.
 
@@ -57,13 +57,28 @@ Indexing is manual and currently re-indexes the corpus, replacing vectors by doc
 
 The implementation uses heading-aware child chunks with a 450-token target and 50-token overlap. It avoids crossing heading/section boundaries, preserves fenced code blocks and tables as units, and keeps list items intact. Each chunk carries `doc_id`, concise heading-based `section_path`, `service`, `environment`, `version`, `owner`, `status`, review timestamp, source path, and content hash. Citations use `doc_id#section_path`.
 
-The implementation uses OpenAI `text-embedding-3-small` (1536 dimensions) plus `pinecone-text` BM25 sparse vectors. The BM25 encoder is fitted and persisted locally from this corpus when indexing. Retrieval scales dense/sparse values with an initial alpha of 0.65; tune it against the labeled set rather than treating it as an accuracy guarantee. Telemetry JSON is deliberately not embedded; the agent reads it through a local read-only fixture tool.
+The implementation uses LangChain `OpenAIEmbeddings` with OpenAI `text-embedding-3-small` (1536 dimensions), plus `pinecone-text` BM25 sparse vectors. The BM25 encoder is fitted and persisted locally from this corpus when indexing. Retrieval scales dense/sparse values with an initial alpha of 0.65; tune it against the labeled set rather than treating it as an accuracy guarantee. Telemetry JSON is deliberately not embedded; the agent reads it through a local read-only fixture tool.
 
 ## Retrieval and answer policy
 
 Before each response, a small model call routes the **latest user message** to incident triage, factual document lookup or prevention, or an out-of-scope reply. Triage answers use the likely-root-cause and possible-fix format when supported; factual and prevention questions receive a direct cited answer. Lookup answers must include an exact excerpt from each cited source; the app checks those excerpts before showing the answer. If the documents omit an exact key, procedure, or other requested detail, the answer says so and directs the user to the project admins. If no relevant support is found, the app says the information is not provided in the sources it can access and directs the user to the project admins. Clearly unrelated questions receive a short scope message. Ambiguous operational messages continue to triage so incident details are not dismissed.
 
-Pinecone stores hybrid dense+sparse chunk vectors. Retrieval requests top 20 results, filters by service (while retaining shared `platform` docs) and environment when known, and excludes superseded procedures unless the question explicitly asks about old guidance. The current version does not yet merge adjacent chunks or use a separate reranker. The OpenAI response contract allows citations only to retrieved source sections and the selected telemetry snapshot; unsupported citations are dropped. It asks for clarification when alert/service context is missing or retrieval returns no evidence.
+Pinecone stores hybrid dense+sparse chunk vectors. The project's `LangChainHybridRetriever` implements LangChain's `BaseRetriever` interface and exposes the existing Pinecone hybrid query as LangChain `Document` results; the indexing path still uses the Pinecone SDK to preserve the existing vector format. Retrieval requests top 20 results, filters by service (while retaining shared `platform` docs) and environment when known, and excludes superseded procedures unless the question explicitly asks about old guidance. The current version does not yet merge adjacent chunks or use a separate reranker. LangChain `ChatOpenAI` produces structured responses; the response contract allows citations only to retrieved source sections and the selected telemetry snapshot, and unsupported citations are dropped. It asks for clarification when alert/service context is missing or retrieval returns no evidence.
+
+This uses LangChain's model and retriever interfaces without adding a LangChain agent loop or LangGraph. The `langchain-openai` dependency is pinned to a Python 3.9-compatible release because this project currently runs on Python 3.9.
+
+To inspect the LangChain retriever directly from the project environment:
+
+```python
+from incident_copilot.runtime import build_agent
+
+agent = build_agent()
+documents = agent.retriever.as_retriever(
+    service="payment-adapter", environment="production"
+).invoke("What triggers the provider timeout alert?")
+print(documents[0].page_content)
+print(documents[0].metadata["section_path"])
+```
 
 Every operational claim should cite one or more retrieved source sections. Separate documented procedure from observed telemetry. If evidence is insufficient, the alert is ambiguous, or sources conflict, the assistant must ask a clarifying question or recommend escalation. The initial agent's telemetry tools are read-only mock fixtures; any future production action requires explicit human approval and a separate authorization design.
 
@@ -73,9 +88,9 @@ The triage summary states a cited likely cause and possible documented fix when 
 
 `evaluation/questions.yaml` contains 28 hand-authored cases with expected source sections, required answer points, abstention expectations, and fixture references. `scripts/evaluate_retrieval.py` reports source-section recall@20, query hit rate@20, and MRR@20 against Pinecone.
 
-`scripts/evaluate_answers.py` runs eight varied cases by default (Q02, Q03, Q13, Q17, Q18, Q20, Q26, Q27), or all 27 with `--all`. The default set includes a factual alert-threshold lookup, a recurrence-prevention question, and an unavailable-detail question. For each case it runs the real retrieval and answer pipeline, then asks an OpenAI judge to check whether **every material claim in each factual statement is supported by that statement's cited source text and incident facts**. A statement with no citation or an invalid reference fails automatically. It also scores citation validity, factual-statement citation coverage, expected answer points, forbidden claims, expected-source citation recall, and whether the requested answer/clarification/escalation/abstention behavior occurred. The report includes the answer, per-statement verdicts, judge reasons, and aggregate scores in `artifacts/answer_evaluation.json`.
+`scripts/evaluate_answers.py` runs eight varied cases by default (Q02, Q03, Q13, Q17, Q18, Q20, Q26, Q27), or all 28 with `--all`. The default set includes a factual alert-threshold lookup, a recurrence-prevention question, and an unavailable-detail question. For each case it runs the real retrieval and answer pipeline, then asks an OpenAI judge to check whether **every material claim in each factual statement is supported by that statement's cited source text and incident facts**. A statement with no citation or an invalid reference fails automatically. It also scores citation validity, factual-statement citation coverage, expected answer points, forbidden claims, expected-source citation recall, and whether the requested answer/clarification/escalation/abstention behavior occurred. The report includes the answer, per-statement verdicts, judge reasons, and aggregate scores in `artifacts/answer_evaluation.json`.
 
-The **faithfulness target is at least 90%** supported factual statements across the evaluated cases. The **latency ceiling is p95 at most 15 seconds** for `agent.triage` (retrieval plus answer generation); grading and browser rendering are excluded. p95 uses the nearest-rank method. An eight-case run is a smoke evaluation, not strong statistical evidence; use all 27 cases and manually review disputed judge verdicts before making an accuracy claim. The judge defaults to `gpt-4o` and can be changed with `OPENAI_JUDGE_MODEL` or `--judge-model`; its verdicts are estimates rather than independent ground truth. This evaluation does not yet score tool selection or compare retrieval configurations.
+The **faithfulness target is at least 90%** supported factual statements across the evaluated cases. The **latency ceiling is p95 at most 15 seconds** for `agent.triage` (retrieval plus answer generation); grading and browser rendering are excluded. p95 uses the nearest-rank method. An eight-case run is a smoke evaluation, not strong statistical evidence; use all 28 cases and manually review disputed judge verdicts before making an accuracy claim. The judge defaults to `gpt-4o` and can be changed with `OPENAI_JUDGE_MODEL` or `--judge-model`; its verdicts are estimates rather than independent ground truth. This evaluation does not yet score tool selection or compare retrieval configurations.
 
 ## Setup and run
 

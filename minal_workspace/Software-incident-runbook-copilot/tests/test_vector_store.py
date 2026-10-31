@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from langchain_core.documents import Document
 from pytest import approx
 from pinecone.exceptions import NotFoundException
 
@@ -123,3 +124,15 @@ def test_search_combines_dense_sparse_and_metadata_filters() -> None:
         {"status": {"$ne": "superseded"}},
     ]}
     assert index.query_args["top_k"] == 7
+
+
+def test_langchain_retriever_exposes_hybrid_results_as_documents() -> None:
+    store = PineconeHybridStore(FakeIndex(), FakeEmbedder(), FakeSparseEncoder())
+
+    documents = store.as_retriever(top_k=3, service="checkout-worker").invoke("consumer lag")
+
+    assert len(documents) == 1
+    assert isinstance(documents[0], Document)
+    assert documents[0].id == "RB-PAY-014:3:0"
+    assert documents[0].page_content == "Check consumer errors and deployment history."
+    assert documents[0].metadata["score"] == 0.88

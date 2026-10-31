@@ -27,7 +27,7 @@ def telemetry_cache_version() -> tuple[tuple[str, int], ...]:
 
 
 @st.cache_resource
-def get_agent(cache_version: tuple[tuple[str, int], ...]):
+def get_agent(cache_version: tuple[tuple[str, int], ...], integration_version: str):
     # Snapshot file changes rebuild the cached agent without discarding open chats.
     return build_agent(SETTINGS)
 
@@ -193,7 +193,7 @@ def main() -> None:
         incident_context = build_incident_context(st.session_state["messages"])
         try:
             with st.spinner("Reviewing the evidence…"):
-                response = get_agent(telemetry_cache_version()).triage(incident_context)
+                response = get_agent(telemetry_cache_version(), "langchain-v1").triage(incident_context)
             st.session_state["messages"].append({"role": "assistant", "response": response.to_dict()})
         except Exception as error:
             st.session_state["messages"].append({

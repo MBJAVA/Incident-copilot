@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "A cited, read-only incident triage copilot"
 requires-python = ">=3.9"
 dependencies = [
+  "langchain-core>=0.3.78,<1.0.0",
+  "langchain-openai==0.3.35",
   "openai>=1.50.0",
   "pinecone>=5.0.0",
   "pinecone-text>=0.10.0",
