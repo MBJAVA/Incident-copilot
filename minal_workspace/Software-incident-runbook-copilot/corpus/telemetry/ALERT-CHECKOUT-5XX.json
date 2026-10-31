@@ -1,0 +1,28 @@
+{
+  "snapshot_id": "SNAP-CHK-001",
+  "fired_at": "2026-10-16T11:40:00Z",
+  "captured_at": "2026-10-16T11:44:00Z",
+  "alert_id": "CHECKOUT-5XX",
+  "service": "checkout-api",
+  "environment": "production",
+  "region": "us-east-1",
+  "severity": "SEV-2",
+  "description": "Checkout API returned elevated HTTP 5xx errors in production us-east-1.",
+  "issue_summary": "At capture, 7.8% of checkout-api requests returned 5xx errors; failing traces first point to inventory-service.",
+  "trigger_summary": "The 7.8% 5xx rate was above the documented 3% threshold. The alert requires this rate to remain above 3% for 5 minutes; this snapshot does not include the time series needed to independently verify that duration.",
+  "metrics": {
+    "checkout_5xx_percent": 7.8,
+    "checkout_5xx_threshold_percent": 3,
+    "checkout_5xx_threshold_duration_minutes": 5,
+    "checkout_request_volume_per_minute": 4800,
+    "inventory_dependency_error_percent": 18,
+    "inventory_dependency_p95_ms": 5200,
+    "payment_adapter_error_percent": 0.4,
+    "session_cache_error_percent": 0.1
+  },
+  "trace_summary": "Failing traces identify inventory-service as the first failing span. checkout-api has no new deployment in the incident window.",
+  "recent_changes": [
+    {"revision": "inv-maint-22", "service": "inventory-service", "changed_at": "2026-10-16T11:31:00Z", "change_type": "database maintenance"}
+  ],
+  "data_gaps": []
+}

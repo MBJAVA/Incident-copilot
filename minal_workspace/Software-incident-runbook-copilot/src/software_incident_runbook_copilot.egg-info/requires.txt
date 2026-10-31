@@ -1,0 +1,10 @@
+openai>=1.50.0
+pinecone>=5.0.0
+pinecone-text>=0.10.0
+python-dotenv>=1.0.0
+PyYAML>=6.0.2
+streamlit>=1.40.0
+tiktoken>=0.7.0
+
+[dev]
+pytest>=8.0.0

@@ -1,0 +1,38 @@
+{
+  "snapshot_id": "SNAP-CACHE-001",
+  "fired_at": "2026-10-22T19:05:00Z",
+  "captured_at": "2026-10-22T19:12:00Z",
+  "alert_id": "CACHE-MISS-SURGE",
+  "service": "session-cache",
+  "environment": "production",
+  "region": "ca-central-1",
+  "severity": "SEV-3",
+  "description": "Session-cache misses surged in production ca-central-1, and session lookups slowed.",
+  "issue_summary": "At capture, 78% of session-cache lookups missed cache and session lookup latency was 840 ms at p95.",
+  "trigger_summary": "The 78% miss ratio exceeded this synthetic alert's 60% miss-ratio threshold. The alert also requires elevated backing-store request rate, but that rate was not captured, so its threshold breach cannot be independently verified from this snapshot.",
+  "metrics": {
+    "cache_miss_ratio_percent": 78,
+    "cache_miss_ratio_threshold_percent": 60,
+    "redis_error_rate_percent": null,
+    "redis_evictions_per_minute": null,
+    "backing_store_request_rate_per_minute": null,
+    "session_latency_p95_ms": 840
+  },
+  "recent_changes": [],
+  "log_summary": "No confirmed TTL change or broad invalidation event in the provided snapshot.",
+  "splunk_searches": [
+    {
+      "name": "session-cache miss messages",
+      "query": "index=commerce service=session-cache region=ca-central-1 (miss OR ERROR)",
+      "earliest_time": "2026-10-22T18:55:00Z",
+      "latest_time": "2026-10-22T19:12:00Z",
+      "result_count": 3,
+      "coverage": "partial; Redis error and eviction logs were not available",
+      "events": [
+        {"_time": "2026-10-22T19:06:21Z", "service": "session-cache", "level": "WARN", "message": "Session cache miss ratio exceeded the alert threshold."},
+        {"_time": "2026-10-22T19:09:08Z", "service": "session-cache", "level": "WARN", "message": "Session lookup latency increased; cause not established."}
+      ]
+    }
+  ],
+  "data_gaps": ["redis_error_rate", "redis_evictions", "backing_store_request_rate", "invalidation_events", "customer_impact"]
+}

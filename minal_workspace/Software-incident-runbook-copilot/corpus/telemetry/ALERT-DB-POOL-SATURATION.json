@@ -1,0 +1,43 @@
+{
+  "snapshot_id": "SNAP-DB-001",
+  "fired_at": "2026-10-12T09:10:00Z",
+  "captured_at": "2026-10-12T09:14:00Z",
+  "alert_id": "DB-POOL-SATURATION",
+  "service": "checkout-api",
+  "environment": "production",
+  "region": "ca-central-1",
+  "severity": "SEV-2",
+  "description": "Checkout API application database connections were under pressure in production ca-central-1.",
+  "issue_summary": "At capture, the application connection pool was 97% utilized, with 34 acquisition timeouts per minute and a 2,100 ms p95 acquisition wait.",
+  "trigger_summary": "The 97% application pool utilization exceeded the documented 90% threshold. That threshold must persist for 5 minutes, which this snapshot cannot independently verify; the alternative acquisition-timeout trigger has no numeric threshold recorded here.",
+  "metrics": {
+    "application_pool_utilization_percent": 97,
+    "application_pool_utilization_threshold_percent": 90,
+    "application_pool_utilization_threshold_duration_minutes": 5,
+    "connection_acquisition_p95_ms": 2100,
+    "application_connection_timeouts_per_minute": 34,
+    "postgres_cpu_percent": 42,
+    "postgres_active_connections": 128,
+    "postgres_connection_limit": 500,
+    "postgres_lock_waits": 0,
+    "inventory_dependency_p95_ms": 4600,
+    "inventory_baseline_p95_ms": 180
+  },
+  "recent_changes": [],
+  "trace_summary": "checkout-api requests hold a database connection while waiting on inventory-service. No new checkout-api revision in the incident window.",
+  "splunk_searches": [
+    {
+      "name": "checkout-api connection acquisition timeouts",
+      "query": "index=commerce service=checkout-api region=ca-central-1 (pool OR timeout)",
+      "earliest_time": "2026-10-12T09:00:00Z",
+      "latest_time": "2026-10-12T09:14:00Z",
+      "result_count": 68,
+      "baseline_count_before_alert": 2,
+      "events": [
+        {"_time": "2026-10-12T09:11:07Z", "service": "checkout-api", "level": "ERROR", "message": "Timed out acquiring an application database connection while inventory-service response was pending."},
+        {"_time": "2026-10-12T09:12:34Z", "service": "checkout-api", "level": "WARN", "message": "Connection acquisition wait exceeded 2 seconds; database server health check remained normal."}
+      ]
+    }
+  ],
+  "data_gaps": []
+}

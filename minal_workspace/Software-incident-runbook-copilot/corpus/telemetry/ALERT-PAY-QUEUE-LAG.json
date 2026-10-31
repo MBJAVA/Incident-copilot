@@ -1,0 +1,46 @@
+{
+  "snapshot_id": "SNAP-PAY-001",
+  "fired_at": "2026-10-18T14:22:00Z",
+  "captured_at": "2026-10-18T14:29:00Z",
+  "alert_id": "PAY-QUEUE-LAG",
+  "service": "checkout-worker",
+  "environment": "production",
+  "region": "ca-central-1",
+  "severity": "SEV-2",
+  "description": "The checkout-worker payment event consumer fell behind in production ca-central-1.",
+  "issue_summary": "At capture, payments-events consumer lag was 18,400 messages, the oldest event was 940 seconds old, and only 3 of 8 expected consumers were active.",
+  "trigger_summary": "The 18,400-message lag exceeded the documented 5,000-message threshold. The alert requires lag above that threshold for 10 minutes; this snapshot does not include the time series needed to independently verify that duration.",
+  "metrics": {
+    "consumer_lag_messages": 18400,
+    "consumer_lag_threshold_messages": 5000,
+    "consumer_lag_threshold_duration_minutes": 10,
+    "lag_change_last_10m_messages": 7200,
+    "oldest_event_age_seconds": 940,
+    "consumer_error_rate_percent": 12.4,
+    "pod_restart_count_last_10m": 9,
+    "active_consumers": 3,
+    "expected_consumers": 8,
+    "kafka_broker_health": "healthy",
+    "checkout_confirmation_p95_ms": 8200
+  },
+  "recent_changes": [
+    {"revision": "8f31", "service": "checkout-worker", "deployed_at": "2026-10-18T14:18:00Z"}
+  ],
+  "log_summary": "Consumer startup configuration validation errors increased after revision 8f31. No secret values or customer identifiers included.",
+  "splunk_searches": [
+    {
+      "name": "checkout-worker startup errors",
+      "query": "index=payments service=checkout-worker region=ca-central-1 (ERROR OR WARN)",
+      "earliest_time": "2026-10-18T14:10:00Z",
+      "latest_time": "2026-10-18T14:29:00Z",
+      "result_count": 47,
+      "baseline_count_before_release": 0,
+      "events": [
+        {"_time": "2026-10-18T14:27:05Z", "service": "checkout-worker", "level": "ERROR", "message": "Consumer startup configuration validation failed after revision 8f31."},
+        {"_time": "2026-10-18T14:27:41Z", "service": "checkout-worker", "level": "ERROR", "message": "Consumer process exited during startup; restart scheduled."},
+        {"_time": "2026-10-18T14:28:16Z", "service": "checkout-worker", "level": "WARN", "message": "Active consumer count below expected replica count."}
+      ]
+    }
+  ],
+  "data_gaps": []
+}

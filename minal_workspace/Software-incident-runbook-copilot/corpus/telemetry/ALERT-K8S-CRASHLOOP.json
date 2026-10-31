@@ -1,0 +1,27 @@
+{
+  "snapshot_id": "SNAP-K8S-001",
+  "fired_at": "2026-10-11T07:15:00Z",
+  "captured_at": "2026-10-11T07:18:00Z",
+  "alert_id": "K8S-CRASHLOOP",
+  "service": "checkout-worker",
+  "environment": "production",
+  "region": "ca-central-1",
+  "severity": "SEV-3",
+  "description": "Two checkout-worker pods repeatedly failed startup or readiness in production ca-central-1.",
+  "issue_summary": "At capture, 2 of 8 desired pods were affected, only 6 were ready, and 11 restarts occurred in the preceding 10 minutes.",
+  "trigger_summary": "The alert fires on repeated pod startup or readiness failures. This snapshot records 11 restarts and 2 readiness probe failures, but the alert definition does not provide a numeric restart or failure threshold.",
+  "metrics": {
+    "affected_pods": 2,
+    "desired_replicas": 8,
+    "ready_replicas": 6,
+    "restarts_last_10m": 11,
+    "node_pressure": "normal",
+    "scheduling_failures": 0,
+    "readiness_probe_failures": 2
+  },
+  "startup_summary": "Startup reports a missing configuration reference after revision c204. Secret values were not collected.",
+  "recent_changes": [
+    {"revision": "c204", "service": "checkout-worker", "deployed_at": "2026-10-11T07:12:00Z"}
+  ],
+  "data_gaps": []
+}

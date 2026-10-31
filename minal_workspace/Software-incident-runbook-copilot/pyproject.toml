@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "software-incident-runbook-copilot"
+version = "0.1.0"
+description = "A cited, read-only incident triage copilot"
+requires-python = ">=3.9"
+dependencies = [
+  "openai>=1.50.0",
+  "pinecone>=5.0.0",
+  "pinecone-text>=0.10.0",
+  "python-dotenv>=1.0.0",
+  "PyYAML>=6.0.2",
+  "streamlit>=1.40.0",
+  "tiktoken>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,33 @@
+{
+  "snapshot_id": "SNAP-PROV-001",
+  "fired_at": "2026-10-15T16:02:00Z",
+  "captured_at": "2026-10-15T16:08:00Z",
+  "alert_id": "PAY-PROVIDER-TIMEOUT",
+  "service": "payment-adapter",
+  "environment": "production",
+  "region": "ca-central-1",
+  "severity": "SEV-2",
+  "description": "Northstar payment request timeouts reached 28% over five minutes, exceeding the 10% alert threshold in production ca-central-1.",
+  "issue_summary": "During the alert's firing window, 28% of Northstar requests timed out; at capture, provider request latency was 9,100 ms at p95 and Northstar's regional status was degraded.",
+  "trigger_summary": "The 28% Northstar timeout rate over five minutes breached this synthetic alert's 10% threshold for five minutes.",
+  "metrics": {
+    "provider": "Northstar",
+    "provider_request_timeout_percent": 28,
+    "provider_request_timeout_threshold_percent": 10,
+    "provider_request_timeout_threshold_duration_minutes": 5,
+    "provider_request_p95_ms": 9100,
+    "adapter_internal_error_percent": 0.3,
+    "other_provider_timeout_percent": 0.2,
+    "circuit_breaker_state": "open",
+    "retry_rate_multiplier": 1.1,
+    "adapter_pod_restarts_last_10m": 0
+  },
+  "trigger_window": {
+    "start": "2026-10-15T15:57:00Z",
+    "end": "2026-10-15T16:02:00Z",
+    "provider_request_timeout_percent": 28
+  },
+  "provider_status": "degraded in ca-central-1; status feed captured at 2026-10-15T16:06:00Z",
+  "recent_changes": [],
+  "data_gaps": []
+}

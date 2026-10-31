@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: software-incident-runbook-copilot
+Version: 0.1.0
+Summary: A cited, read-only incident triage copilot
+Requires-Python: >=3.9
+Requires-Dist: openai>=1.50.0
+Requires-Dist: pinecone>=5.0.0
+Requires-Dist: pinecone-text>=0.10.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: PyYAML>=6.0.2
+Requires-Dist: streamlit>=1.40.0
+Requires-Dist: tiktoken>=0.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
