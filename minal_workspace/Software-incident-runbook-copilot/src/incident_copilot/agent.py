@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from typing import Protocol
 
 from incident_copilot.models import (
@@ -103,7 +104,8 @@ class IncidentAgent:
                        or _mentioned_environment(latest_update)
                        or _mentioned_environment(cleaned_incident))
         snapshot = self._get_snapshot(
-            cleaned_incident, alert_id, service, details.get("region"), details.get("fired_at")
+            cleaned_incident, latest_update, alert_id, service,
+            details.get("region"), details.get("fired_at")
         )
         if snapshot is not None:
             alert_id = alert_id or snapshot.alert_id
@@ -160,18 +162,32 @@ class IncidentAgent:
                 "needs_clarification": True,
             }
         allowed_citations = _allowed_citations(evidence, snapshot)
-        return _response_from_model(
+        response = _response_from_model(
             model_result, allowed_citations, mode=intent,
             source_texts=_source_texts(evidence, snapshot),
         )
+        if intent == "incident" and snapshot is not None and snapshot.alert_id == "CACHE-MISS-SURGE":
+            conditional_paths = _cache_recovery_paths(evidence)
+            if conditional_paths and not response.likely_causes:
+                response = replace(response, recovery_options=conditional_paths)
+        return response
 
-    def _get_snapshot(self, incident: str, alert_id: str | None, service: str | None,
+    def _get_snapshot(self, incident: str, latest_update: str,
+                      alert_id: str | None, service: str | None,
                       region: str | None, fired_at: str | None) -> TelemetrySnapshot | None:
         snapshot_id = SNAPSHOT_ID_PATTERN.search(incident)
         if snapshot_id:
             return self.telemetry.get_snapshot(snapshot_id.group(0))
         if alert_id and service and region and fired_at:
             return self.telemetry.find_incident(alert_id, service, region, fired_at)
+        # A verbatim fixture description is an explicit reference in this prototype.
+        # Paraphrases must not inherit historical telemetry from a similar alert.
+        snapshot = self.telemetry.find_exact_description(latest_update)
+        if snapshot is not None:
+            return snapshot
+        if "Initial incident report:\n" in incident:
+            initial_report = incident.split("Initial incident report:\n", 1)[1].split("\n\n", 1)[0]
+            return self.telemetry.find_exact_description(initial_report)
         return None
 
 
@@ -301,6 +317,31 @@ def _source_texts(evidence: list[RetrievedEvidence],
             json.dumps(snapshot.payload, ensure_ascii=False)
         ]
     return texts
+
+
+def _cache_recovery_paths(evidence: list[RetrievedEvidence]) -> list[CitedStatement]:
+    """Quote the active cache runbook's conditional paths without choosing one."""
+    paths: list[CitedStatement] = []
+    seen: set[str] = set()
+    for section in ("Recovery decision", "Verification"):
+        for item in evidence:
+            chunk = item.chunk
+            if (chunk.doc_id != "RB-CACHE-005" or chunk.status != "active"
+                    or chunk.section_path != section):
+                continue
+            body = re.sub(r"^#{1,6}\s+[^\n]*\n", "", chunk.content).strip()
+            citation = Citation(chunk.doc_id, chunk.section_path, chunk.source_path)
+            for paragraph in re.split(r"\n\s*\n", body):
+                paragraph = paragraph.strip()
+                if paragraph in seen:
+                    continue
+                if section == "Recovery decision" and paragraph.startswith("If "):
+                    paths.append(CitedStatement(paragraph, [citation]))
+                    seen.add(paragraph)
+                elif section == "Verification" and paragraph.startswith("Confirm "):
+                    paths.append(CitedStatement("After mitigation: " + paragraph, [citation]))
+                    seen.add(paragraph)
+    return paths
 
 
 def _has_verified_lookup_quotes(result: dict[str, object], summary: CitedStatement,

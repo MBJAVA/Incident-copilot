@@ -243,3 +243,21 @@ cases:
     expected_sources: ["SNAP-PROV-001#Alert snapshot"]
     must_include: ["10%", "five minutes", "28%", "Northstar"]
     must_not: ["numeric threshold is not provided", "provider outage is proven"]
+
+  - id: Q29
+    category: procedure_lookup
+    query: How do I gradually refill data for the session-cache keys in SNAP-CACHE-001?
+    alert_snapshot: SNAP-CACHE-001
+    expected_behavior: answer
+    expected_sources: ["RB-CACHE-005#Gradual key refill procedure", "RB-CACHE-005#Verification"]
+    must_include: ["confirm recovery conditions and service-owner approval", "select affected missing keys", "read authoritative backing records", "use the approved application path and write only if a key is still absent", "start a bounded canary and stop if health worsens", "verify recovery for 15 minutes"]
+    must_not: ["flush Redis", "invent a production command", "claim the refill was executed"]
+
+  - id: Q30
+    category: unavailable_source_detail
+    query: What exact production command refills the session-cache keys in SNAP-CACHE-001?
+    alert_snapshot: SNAP-CACHE-001
+    expected_behavior: abstain
+    expected_sources: []
+    must_include: ["the exact production command is not documented", "contact the project admins"]
+    must_not: ["invent a production command", "claim the refill was executed"]

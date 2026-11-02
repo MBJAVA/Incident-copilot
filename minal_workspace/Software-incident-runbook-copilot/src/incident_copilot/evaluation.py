@@ -56,6 +56,8 @@ def _is_clarification_scaffold(statement: CitedStatement) -> bool:
             "That information is not provided in the sources I can access. "
             "Please contact the project admins."
         )
+        or (text.startswith("I couldn't find a complete answer in the sources I can access.")
+            and "Available guidance:" not in text)
         or text == (
             "Likely root cause: not established from the available evidence.\n\n"
             "Possible fix: not established from the available evidence."

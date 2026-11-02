@@ -16,7 +16,7 @@ All content in this prototype is synthetic and fictional. It is written as Engli
 - 5 architecture documents: service map, checkout/event flow, alert semantics, change/rollback policy, and ownership/escalation.
 - 6 postmortems: five resolved incidents and one deliberately inconclusive incident to test abstention.
 - 6 synthetic incident snapshots: alert and telemetry evidence, kept separate from the searchable prose corpus. Three include representative Splunk-style search results.
-- 28 labeled evaluation questions: direct lookup, diagnosis, prevention, similar-incident discrimination, conflicting/stale evidence, safety boundaries, and insufficient-evidence cases.
+- 30 labeled evaluation questions: direct lookup, diagnosis, prevention, procedures, similar-incident discrimination, conflicting/stale evidence, safety boundaries, and insufficient-evidence cases.
 
 For a real deployment, service owners remain authoritative for runbooks and architecture docs; the incident-management system owns postmortems; observability systems own alerts and telemetry. This sample corpus is a learning fixture, not a production source of truth.
 
@@ -38,7 +38,7 @@ The seed files are already plain Markdown/JSON. The parser currently normalizes 
 
 The JSON files in `corpus/telemetry` stand in for read-only alert, metrics, and Splunk searches. The PAY-QUEUE-LAG, DB-POOL-SATURATION, and CACHE-MISS-SURGE fixtures include time-bounded searches with aggregate result counts and a few representative timestamped events. They are not a complete log archive or a live Splunk connection.
 
-To avoid treating an older fixture as evidence for a new alert of the same type, the agent attaches a fixture only when the chat explicitly names its `snapshot_id` or supplies a matching alert ID, service, region, and exact `fired_at` timestamp. For example:
+To avoid treating an older fixture as evidence for a new alert of the same type, the agent attaches a fixture when the chat explicitly names its `snapshot_id`, supplies a matching alert ID, service, region, and exact `fired_at` timestamp, or begins with a unique fixture description using its exact wording (a follow-up request may follow it). The description shortcut is for this synthetic prototype; a paraphrase or alert name alone does not attach historical telemetry. For example:
 
 ```text
 Alert ID: PAY-QUEUE-LAG
@@ -84,13 +84,15 @@ Every operational claim should cite one or more retrieved source sections. Separ
 
 The triage summary states a cited likely cause and possible documented fix when both are supported. It distinguishes historical postmortem resolutions from current actions, shows diagnostic checks and recovery options separately, and asks focused questions when it cannot establish a cause or safe recovery path. Recovery options describe required human approval; the assistant does not execute them.
 
+For the inconclusive `SNAP-CACHE-001` case, the assistant keeps the cause and immediate fix unconfirmed, but shows the active cache runbook's conditional recovery and verification steps with citations. The runbook now includes a six-step gradual key refill procedure; the exact production command, key format, and rate limit remain service-owner inputs. The assistant does not select a mitigation until the missing Redis, backing-store, and invalidation evidence establishes which condition applies.
+
 ## Evaluation
 
-`evaluation/questions.yaml` contains 28 hand-authored cases with expected source sections, required answer points, abstention expectations, and fixture references. `scripts/evaluate_retrieval.py` reports source-section recall@20, query hit rate@20, and MRR@20 against Pinecone.
+`evaluation/questions.yaml` contains 30 hand-authored cases with expected source sections, required answer points, abstention expectations, and fixture references. `scripts/evaluate_retrieval.py` reports source-section recall@20, query hit rate@20, and MRR@20 against Pinecone.
 
-`scripts/evaluate_answers.py` runs eight varied cases by default (Q02, Q03, Q13, Q17, Q18, Q20, Q26, Q27), or all 28 with `--all`. The default set includes a factual alert-threshold lookup, a recurrence-prevention question, and an unavailable-detail question. For each case it runs the real retrieval and answer pipeline, then asks an OpenAI judge to check whether **every material claim in each factual statement is supported by that statement's cited source text and incident facts**. A statement with no citation or an invalid reference fails automatically. It also scores citation validity, factual-statement citation coverage, expected answer points, forbidden claims, expected-source citation recall, and whether the requested answer/clarification/escalation/abstention behavior occurred. The report includes the answer, per-statement verdicts, judge reasons, and aggregate scores in `artifacts/answer_evaluation.json`.
+`scripts/evaluate_answers.py` runs eight varied cases by default (Q02, Q03, Q13, Q17, Q18, Q20, Q26, Q27), or all 30 with `--all`. The default set includes a factual alert-threshold lookup, a recurrence-prevention question, and an unavailable-detail question. For each case it runs the real retrieval and answer pipeline, then asks an OpenAI judge to check whether **every material claim in each factual statement is supported by that statement's cited source text and incident facts**. A statement with no citation or an invalid reference fails automatically. It also scores citation validity, factual-statement citation coverage, expected answer points, forbidden claims, expected-source citation recall, and whether the requested answer/clarification/escalation/abstention behavior occurred. The report includes the answer, per-statement verdicts, judge reasons, and aggregate scores in `artifacts/answer_evaluation.json`.
 
-The **faithfulness target is at least 90%** supported factual statements across the evaluated cases. The **latency ceiling is p95 at most 15 seconds** for `agent.triage` (retrieval plus answer generation); grading and browser rendering are excluded. p95 uses the nearest-rank method. An eight-case run is a smoke evaluation, not strong statistical evidence; use all 28 cases and manually review disputed judge verdicts before making an accuracy claim. The judge defaults to `gpt-4o` and can be changed with `OPENAI_JUDGE_MODEL` or `--judge-model`; its verdicts are estimates rather than independent ground truth. This evaluation does not yet score tool selection or compare retrieval configurations.
+The **faithfulness target is at least 90%** supported factual statements across the evaluated cases. The **latency ceiling is p95 at most 15 seconds** for `agent.triage` (retrieval plus answer generation); grading and browser rendering are excluded. p95 uses the nearest-rank method. An eight-case run is a smoke evaluation, not strong statistical evidence; use all 30 cases and manually review disputed judge verdicts before making an accuracy claim. The judge defaults to `gpt-4o` and can be changed with `OPENAI_JUDGE_MODEL` or `--judge-model`; its verdicts are estimates rather than independent ground truth. This evaluation does not yet score tool selection or compare retrieval configurations.
 
 ## Setup and run
 

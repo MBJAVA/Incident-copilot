@@ -4,7 +4,8 @@ from pathlib import Path
 
 from incident_copilot.agent import IncidentAgent
 from incident_copilot.conversation import build_incident_context
-from incident_copilot.corpus import load_telemetry_snapshots
+from incident_copilot.corpus import load_documents, load_telemetry_snapshots
+from incident_copilot.documents import chunk_document
 from incident_copilot.models import (
     Citation,
     EvidenceChunk,
@@ -419,6 +420,66 @@ def test_alert_name_alone_does_not_attach_an_old_fixture() -> None:
     assert responder.last_snapshot is None
 
 
+def test_verbatim_fixture_description_selects_the_saved_incident() -> None:
+    snapshots = load_telemetry_snapshots(Path(__file__).parents[1] / "corpus")
+    retriever = FakeRetriever([make_evidence()])
+    responder = FakeResponder({})
+    agent = IncidentAgent(retriever, ReadOnlyTelemetryTools(snapshots), responder)
+
+    agent.triage(
+        "Two checkout-worker pods repeatedly failed startup or readiness "
+        "in production ca-central-1"
+    )
+
+    assert responder.last_snapshot.snapshot_id == "SNAP-K8S-001"
+    assert retriever.calls[0]["service"] == "checkout-worker"
+    assert retriever.calls[0]["environment"] == "production"
+
+
+def test_description_followed_by_a_triage_request_selects_saved_incident() -> None:
+    snapshots = load_telemetry_snapshots(Path(__file__).parents[1] / "corpus")
+    responder = FakeResponder({})
+    agent = IncidentAgent(FakeRetriever([make_evidence()]),
+                          ReadOnlyTelemetryTools(snapshots), responder)
+
+    agent.triage(
+        "Two checkout-worker pods repeatedly failed startup or readiness "
+        "in production ca-central-1, help me triage this alert"
+    )
+
+    assert responder.last_snapshot.snapshot_id == "SNAP-K8S-001"
+
+
+def test_paraphrased_crashloop_report_does_not_inherit_old_snapshot() -> None:
+    snapshots = load_telemetry_snapshots(Path(__file__).parents[1] / "corpus")
+    responder = FakeResponder({})
+    agent = IncidentAgent(FakeRetriever([make_evidence()]),
+                          ReadOnlyTelemetryTools(snapshots), responder)
+
+    agent.triage("Two checkout-worker pods are failing readiness now in production ca-central-1")
+
+    assert responder.last_snapshot is None
+
+
+def test_follow_up_retains_snapshot_matched_by_verbatim_description() -> None:
+    snapshots = load_telemetry_snapshots(Path(__file__).parents[1] / "corpus")
+    responder = FakeResponder({})
+    agent = IncidentAgent(FakeRetriever([make_evidence()]),
+                          ReadOnlyTelemetryTools(snapshots), responder)
+    messages = [
+        {"role": "user", "content": (
+            "Two checkout-worker pods repeatedly failed startup or readiness "
+            "in production ca-central-1, help me triage this alert"
+        )},
+        {"role": "assistant", "response": {"clarifying_questions": []}},
+        {"role": "user", "content": "What should we check next?"},
+    ]
+
+    agent.triage(build_incident_context(messages))
+
+    assert responder.last_snapshot.snapshot_id == "SNAP-K8S-001"
+
+
 def test_alert_metadata_selects_matching_fixture() -> None:
     snapshots = load_telemetry_snapshots(Path(__file__).parents[1] / "corpus")
     retriever = FakeRetriever([make_evidence()])
@@ -466,6 +527,31 @@ def test_fixture_with_known_data_gaps_asks_before_naming_a_cause_or_fix() -> Non
     assert "Likely root cause: not established" in result.summary.text
     assert "Possible fix: not established" in result.summary.text
     assert result.clarifying_questions == ["Were cache keys invalidated?"]
+
+
+def test_cache_gap_shows_conditional_runbook_recovery_without_claiming_a_fix() -> None:
+    corpus_root = Path(__file__).parents[1] / "corpus"
+    snapshots = load_telemetry_snapshots(corpus_root)
+    cache_runbook = next(doc for doc in load_documents(corpus_root) if doc.doc_id == "RB-CACHE-005")
+    evidence = [
+        RetrievedEvidence(chunk=chunk, score=0.9)
+        for chunk in chunk_document(cache_runbook)
+        if chunk.section_path in {"Recovery decision", "Verification"}
+    ]
+    agent = IncidentAgent(FakeRetriever(list(reversed(evidence))), ReadOnlyTelemetryTools(snapshots),
+                          FakeResponder({}))
+
+    result = agent.triage("SNAP-CACHE-001: How do we fix the miss surge?")
+
+    assert "Likely root cause: not established" in result.summary.text
+    assert "Possible fix: not established" in result.summary.text
+    assert result.needs_clarification
+    assert len(result.recovery_options) == 3
+    assert "gradual refill or TTL-jitter" in result.recovery_options[0].text
+    assert "If Redis errors or evictions are elevated" in result.recovery_options[1].text
+    assert "15 minutes" in result.recovery_options[2].text
+    assert all(option.citations[0].doc_id == "RB-CACHE-005"
+               for option in result.recovery_options)
 
 
 def test_summary_prefers_current_snapshot_evidence_to_historical_cause() -> None:

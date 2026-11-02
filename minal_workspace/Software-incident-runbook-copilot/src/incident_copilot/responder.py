@@ -77,9 +77,19 @@ ownership, and incident history using only the retrieved evidence and incident d
 Answer current_question directly; the older incident text only explains references such as
 'this key' or 'that alert'. Do not repeat an earlier diagnosis when the latest question asks
 how to investigate or repair it. For a procedural question, use the applicable runbook recovery
-decision and verification guidance. If a configuration reference is missing, do not assume a
+decision, specific procedure, and verification guidance. When asked how to refill cache keys,
+summary.text must cover the documented gradual key refill sequence: confirm the recovery
+conditions and owner approval; select affected missing keys; verify each authoritative
+backing record; use the approved application path to write only still-missing keys with
+approved TTL/jitter; start a bounded canary and stop if health worsens; then verify recovery
+for 15 minutes. Cite the procedure and verification sections. Do not omit the canary,
+stop conditions, or verification when answering a broad refill how-to. A procedure can
+answer a broad how-to question even when it intentionally
+leaves the production command, key IDs, and rate limit to the service owner; state that
+boundary in the answer. Mark it partial only if the user requests those exact missing details.
+If a configuration reference is missing, do not assume a
 new key must be created: the reference itself may need correction. Explicitly say when the
-documents do not identify the exact key, command, or change procedure. Never invent one or
+documents do not identify an exact key, command, or change procedure that the user requested. Never invent one or
 disclose secret values.
 Set answer_status to answered only if the retrieved evidence answers the exact current_question.
 When answer_status is answered, summary.text must directly answer current_question and

@@ -39,6 +39,17 @@ def test_visible_abstention_text_is_available_to_the_answer_judge() -> None:
     assert "Likely root cause: not established" in answer_text(response)
 
 
+def test_partial_abstention_without_guidance_is_not_a_factual_statement() -> None:
+    response = response_with(CitedStatement(
+        "I couldn't find a complete answer in the sources I can access. "
+        "The exact production command is not documented. Please contact the project admins.", []
+    ))
+
+    assert answer_statements(response) == []
+    assert behavior_matches("abstain", response)
+    assert "exact production command" in answer_text(response)
+
+
 def test_statement_grading_requires_a_valid_supporting_citation() -> None:
     citation = Citation("RB-PAY-014", "Triage", "runbooks/RB-PAY-014.md")
     statements = answer_statements(response_with(CitedStatement("Restart the broker.", [citation])))

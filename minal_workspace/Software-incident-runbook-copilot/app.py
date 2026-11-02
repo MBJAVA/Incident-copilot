@@ -47,6 +47,11 @@ def render_statement(statement: CitedStatement, *, emphasize_summary: bool = Fal
 def render_response(response: TriageResponse) -> None:
     render_statement(response.summary, emphasize_summary=True)
 
+    if response.recovery_options and not response.likely_causes:
+        st.markdown("**Documented conditional recovery and verification:**")
+        for option in response.recovery_options:
+            render_statement(option)
+
     if response.clarifying_questions:
         st.markdown("**To continue, tell me:**")
         for question in response.clarifying_questions:
@@ -65,7 +70,8 @@ def render_response(response: TriageResponse) -> None:
                 for gap in response.missing_evidence:
                     st.markdown(f"- {gap}")
             _render_statements("Recommended checks", response.recommended_checks)
-            _render_statements("Possible recovery options", response.recovery_options)
+            if response.likely_causes:
+                _render_statements("Possible recovery options", response.recovery_options)
             if response.escalation.text:
                 st.markdown("**Escalation**")
                 render_statement(response.escalation)
@@ -193,7 +199,7 @@ def main() -> None:
         incident_context = build_incident_context(st.session_state["messages"])
         try:
             with st.spinner("Reviewing the evidence…"):
-                response = get_agent(telemetry_cache_version(), "langchain-v1").triage(incident_context)
+                response = get_agent(telemetry_cache_version(), "cache-refill-v5").triage(incident_context)
             st.session_state["messages"].append({"role": "assistant", "response": response.to_dict()})
         except Exception as error:
             st.session_state["messages"].append({
