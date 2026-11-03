@@ -55,7 +55,7 @@ Indexing is manual and currently re-indexes the corpus, replacing vectors by doc
 
 ## Chunking and embeddings
 
-The implementation uses heading-aware child chunks with a 450-token target and 50-token overlap. It avoids crossing heading/section boundaries, preserves fenced code blocks and tables as units, and keeps list items intact. Each chunk carries `doc_id`, concise heading-based `section_path`, `service`, `environment`, `version`, `owner`, `status`, review timestamp, source path, and content hash. Citations use `doc_id#section_path`.
+The implementation uses heading-aware chunks with a 450-token ceiling and up to 50 tokens of overlap only when a section needs multiple chunks. In the current corpus, all 92 sections fit in one chunk (median 46.5 tokens, maximum 414), so overlap is not used. It avoids crossing heading/section boundaries, preserves fenced code blocks and tables as units, and keeps list items intact. Each chunk carries `doc_id`, concise heading-based `section_path`, `service`, `environment`, `version`, `owner`, `status`, review timestamp, source path, and content hash. Citations use `doc_id#section_path`.
 
 The implementation uses LangChain `OpenAIEmbeddings` with OpenAI `text-embedding-3-small` (1536 dimensions), plus `pinecone-text` BM25 sparse vectors. The BM25 encoder is fitted and persisted locally from this corpus when indexing. Retrieval scales dense/sparse values with an initial alpha of 0.65; tune it against the labeled set rather than treating it as an accuracy guarantee. Telemetry JSON is deliberately not embedded; the agent reads it through a local read-only fixture tool.
 
