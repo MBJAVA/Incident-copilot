@@ -38,7 +38,7 @@ The seed files are already plain Markdown/JSON. The parser currently normalizes 
 
 The JSON files in `corpus/telemetry` stand in for read-only alert, metrics, and Splunk searches. The PAY-QUEUE-LAG, DB-POOL-SATURATION, and CACHE-MISS-SURGE fixtures include time-bounded searches with aggregate result counts and a few representative timestamped events. They are not a complete log archive or a live Splunk connection.
 
-To avoid treating an older fixture as evidence for a new alert of the same type, the agent attaches a fixture when the chat explicitly names its `snapshot_id`, supplies a matching alert ID, service, region, and exact `fired_at` timestamp, or begins with a unique fixture description using its exact wording (a follow-up request may follow it). The description shortcut is for this synthetic prototype; a paraphrase or alert name alone does not attach historical telemetry. For example:
+To avoid treating an older fixture as evidence for a new alert of the same type, the agent attaches a fixture when the chat explicitly names its `snapshot_id`, supplies a matching alert ID, service, region, and exact `fired_at` timestamp, begins with a unique fixture description using its exact wording, or uses a close description match with the same service, environment, and region. The description shortcut is for this synthetic prototype; a broad symptom or alert name alone does not attach historical telemetry. For example:
 
 ```text
 Alert ID: PAY-QUEUE-LAG
@@ -83,6 +83,8 @@ print(documents[0].metadata["section_path"])
 Every operational claim should cite one or more retrieved source sections. Separate documented procedure from observed telemetry. If evidence is insufficient, the alert is ambiguous, or sources conflict, the assistant must ask a clarifying question or recommend escalation. The initial agent's telemetry tools are read-only mock fixtures; any future production action requires explicit human approval and a separate authorization design.
 
 The triage summary states a cited likely cause and possible documented fix when both are supported. It distinguishes historical postmortem resolutions from current actions, shows diagnostic checks and recovery options separately, and asks focused questions when it cannot establish a cause or safe recovery path. Recovery options describe required human approval; the assistant does not execute them.
+
+For a symptom-only checkout-worker pod startup report, the assistant recognizes `checkout-worker` as the service. When the wording closely matches the saved CrashLoop description and production region, it uses that fixture's startup evidence to give the recorded likely cause; a broad symptom or different region remains an evidence-seeking investigation and does not inherit historical telemetry.
 
 For the inconclusive `SNAP-CACHE-001` case, the assistant keeps the cause and immediate fix unconfirmed, but shows the active cache runbook's conditional recovery and verification steps with citations. The runbook now includes a six-step gradual key refill procedure; the exact production command, key format, and rate limit remain service-owner inputs. The assistant does not select a mitigation until the missing Redis, backing-store, and invalidation evidence establishes which condition applies.
 
